@@ -1,66 +1,114 @@
 import 'source-map-support/register';
 import * as path from 'path';
-import * as url from 'url';
-import { ipcMain } from 'electron';
+import * as fs from 'fs-extra';
 import * as req from 'request-promise';
-import { app, BrowserWindow } from 'electron';
-import { IWindows } from '../@types/index';
+import * as state from './state';
+import * as config from './config';
+import { app, ipcMain, Tray, Menu } from 'electron';
+import { getPassword } from 'keytar';
+import { setAppSettings } from './app-settings';
+import { IAppData } from '../@types';
+import * as reload from 'electron-reload';
 
-if (!process.env.NODE_ENV) {
-    const reload = require('electron-reload');
+app.setName('TeamCity Notififer');
 
-    reload(__dirname, {
-        electron: path.join(__dirname, '..', 'node_modules', '.bin', 'electron')
-    });
+reload(__dirname, {
+    electron: path.join(__dirname, '..', 'node_modules', '.bin', 'electron')
+});
+
+export let appTray: Electron.Tray;
+
+async function shouldLogin(): Promise<boolean> {
+    const data: IAppData = await fs.readJson(config.dataPath);
+
+    const existingPassword = await getPassword(app.getName(), data.username);
+
+    if (existingPassword) {
+        setAppSettings(data, existingPassword);
+        return false;
+    }
+
+    setAppSettings(data);
+
+    return true;
 }
 
-const windows: IWindows = {
-    login: null
-};
+async function init() {
+    let doLogin = true;
 
-function createWindow() {
-    windows.login = new BrowserWindow({
-        width: 600,
-        height: 600,
-        center: true,
-        resizable: false,
-        fullscreenable: false,
-        minimizable: false
-    });
+    try {
+        doLogin = await shouldLogin();
+    } catch (e) {
+        if (e.code !== 'ENOENT') {
+            throw e;
+        }
+    }
 
-    windows.login.loadURL(
-        url.format({
-            pathname: path.join(__dirname, 'login.html'),
-            protocol: 'file:',
-            slashes: true
-        })
-    );
+    appTray = new Tray(config.iconPath);
+    appTray.setToolTip('TeamCity Notifier');
 
-    windows.login.on('closed', () => {
-        windows.login = null;
-    });
+    state.init(doLogin);
 }
 
-app.on('ready', createWindow);
+app.on('ready', async function() {
+    const mainMenu = Menu.buildFromTemplate([
+        {
+            label: app.getName(),
+            submenu: [
+                {
+                    label: 'Quit',
+                    accelerator: 'Command+Q',
+                    click: () => app.quit()
+                }
+            ]
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                {
+                    label: 'Select All',
+                    accelerator: 'Command+A',
+                    role: 'selectall'
+                },
+                {
+                    label: 'Copy',
+                    role: 'copy',
+                    accelerator: 'Command+C'
+                },
+                {
+                    label: 'Paste',
+                    role: 'paste',
+                    accelerator: 'Command+V'
+                }
+            ]
+        }
+    ]);
 
-app.on('window-all-closed', () => {
-    // On macOS it is common for applications and their menu bar
-    // to stay active until the user quits explicitly with Cmd + Q
-    if (process.platform !== 'darwin') {
-        app.quit();
+    Menu.setApplicationMenu(mainMenu);
+
+    try {
+        await init();
+    } catch (e) {
+        console.error(e);
+        // todo: open error window
     }
 });
 
 app.on('activate', () => {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (windows.login === null) {
-        createWindow();
+});
+
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
     }
 });
 
 ipcMain.on('authenticate', async function(event: Electron.IpcMessageEvent, data: any) {
     const { url, username, password } = data;
+
+    let success = false;
 
     try {
         await req({
@@ -70,6 +118,8 @@ ipcMain.on('authenticate', async function(event: Electron.IpcMessageEvent, data:
                 pass: password
             }
         });
+
+        success = true;
     } catch (e) {
         let message = 'There was an error contacting the server.';
 
@@ -80,5 +130,9 @@ ipcMain.on('authenticate', async function(event: Electron.IpcMessageEvent, data:
         }
 
         event.sender.send('authenticate-error', message);
+    }
+
+    if (success) {
+        state.setLoggedIn(url, username, password);
     }
 });

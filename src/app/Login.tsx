@@ -5,11 +5,13 @@ import { Grid, Header, Form, Segment, Image, Input, Button } from 'semantic-ui-r
 
 class Login extends React.Component {
     componentDidMount() {
+        ipc.on('app-settings', this.handleAppSettings);
         ipc.on('authenticate-error', this.handleAuthError);
     }
 
     componentWillUnmount() {
         ipc.removeListener('authenticate-error', this.handleAuthError);
+        ipc.removeListener('app-settings', this.handleAppSettings);
     }
 
     state = {
@@ -18,6 +20,13 @@ class Login extends React.Component {
         password: '',
         isLoading: false,
         error: ''
+    };
+
+    handleAppSettings = (_e: Electron.IpcMessageEvent, settings: any) => {
+        this.setState({
+            url: settings.url || '',
+            username: settings.username || ''
+        });
     };
 
     handleAuthError = (_e: Electron.IpcMessageEvent, err: any) => {
@@ -42,7 +51,7 @@ class Login extends React.Component {
 
     handleChange = (e: any) => {
         this.setState({
-            [e.target.name]: e.target.value.trim()
+            [e.target.name]: e.target.value
         });
     };
 
@@ -59,25 +68,33 @@ class Login extends React.Component {
                             Fill out the credentials for your TeamCity account. <strong>This project does not intrude on credentials.</strong>
                         </Header>
                     </Grid.Column>
-                    {this.state.error
-                        ? <Grid.Column>
-                              <Segment color="red" inverted>
-                                  {this.state.error}
-                              </Segment>
-                          </Grid.Column>
-                        : null}
+                    {this.state.error ? (
+                        <Grid.Column>
+                            <Segment color="red" inverted>
+                                {this.state.error}
+                            </Segment>
+                        </Grid.Column>
+                    ) : null}
                     <Grid.Column>
                         <Form onSubmit={this.handleSubmit} loading={this.state.isLoading}>
                             <Segment>
                                 <Form.Field required>
                                     <label>TeamCity URL</label>
-                                    <Input fluid name="url" label="https://" defaultValue={this.state.url} onChange={this.handleChange} required />
+                                    <Input
+                                        fluid
+                                        name="url"
+                                        icon="cloud"
+                                        iconPosition="left"
+                                        value={this.state.url}
+                                        onChange={this.handleChange}
+                                        required
+                                    />
                                 </Form.Field>
                                 <Form.Input
                                     fluid
                                     name="username"
                                     label="TeamCity Username"
-                                    defaultValue={this.state.username}
+                                    value={this.state.username}
                                     onChange={this.handleChange}
                                     icon="user"
                                     iconPosition="left"
@@ -88,14 +105,13 @@ class Login extends React.Component {
                                     name="password"
                                     label="TeamCity Password"
                                     type="password"
-                                    defaultValue={this.state.password}
                                     onChange={this.handleChange}
                                     icon="lock"
                                     iconPosition="left"
                                     required
                                 />
                                 <Button fluid primary>
-                                    Sign In
+                                    Log In
                                 </Button>
                             </Segment>
                         </Form>

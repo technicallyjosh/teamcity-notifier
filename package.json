@@ -1,37 +1,54 @@
 {
-    "name": "teamcity-notifier",
+    "name": "teamcity-notififer",
     "version": "0.1.0",
     "main": "dist/main.js",
     "license": "MIT",
     "scripts": {
         "dev": "yarn build && concurrently 'gulp' 'tsc --watch' 'webpack --watch' 'electron .'",
-        "build": "tsc && gulp copy && webpack"
+        "build": "rm -rf dist && tsc && gulp copy && webpack",
+        "dist": "yarn build && electron-builder",
+        "postinstall": "electron-builder install-app-deps"
+    },
+    "build": {
+        "appId": "com.technicallyjosh.teamcity-notifier",
+        "mac": {
+            "category": "public.app-category.developer-tools",
+            "icon": "teamcity.icns"
+        },
+        "directories": {
+            "output": "build"
+        }
     },
     "dependencies": {
-        "electron": "^1.7.5",
+        "electron-reload": "^1.2.1",
+        "fs-extra": "^4.0.1",
+        "keytar": "^4.0.4",
         "request": "^2.81.0",
         "request-promise": "^4.2.1",
         "source-map-support": "^0.4.16"
     },
     "devDependencies": {
-        "@types/node": "^8.0.24",
+        "@types/fs-extra": "^4.0.1",
+        "@types/keytar": "^4.0.1",
+        "@types/node": "^8.0.26",
         "@types/prop-types": "^15.5.1",
-        "@types/react": "^16.0.3",
+        "@types/react": "^16.0.5",
         "@types/react-dom": "^15.5.4",
         "@types/request-promise": "^4.1.37",
         "awesome-typescript-loader": "^3.2.3",
         "concurrently": "^3.5.0",
-        "electron-reload": "^1.2.1",
+        "electron": "^1.7.5",
+        "electron-builder": "^19.27.3",
         "gulp": "^3.9.1",
         "merge-stream": "^1.0.1",
         "prop-types": "^15.5.10",
         "react": "^15.6.1",
         "react-dom": "^15.6.1",
         "semantic-ui-css": "^2.2.12",
-        "semantic-ui-react": "^0.71.5",
+        "semantic-ui-react": "^0.72.0",
         "source-map-loader": "^0.2.1",
-        "tslint": "^5.6.0",
-        "typescript": "^2.4.2",
+        "tslint": "^5.7.0",
+        "typescript": "^2.5.2",
         "webpack": "^3.5.5"
     }
 }
